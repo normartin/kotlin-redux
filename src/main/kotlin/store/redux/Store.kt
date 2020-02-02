@@ -16,7 +16,7 @@ class Store<ACTION, STATE>(initial: STATE, private val reducer: Reducer<ACTION, 
     private val emitter = UnicastProcessor.create(ConcurrentLinkedQueue<ACTION>())
     private val scheduler = Schedulers.single()
 
-    val flux: Flux<STATE> = emitter
+    val updates: Flux<STATE> = emitter
         .scan(initial, { oldState, event ->
             val newState = try {
                 reducer(event, oldState)
@@ -29,7 +29,7 @@ class Store<ACTION, STATE>(initial: STATE, private val reducer: Reducer<ACTION, 
         .cache(1)
         .subscribeOn(scheduler)
 
-    fun state(): STATE = flux.blockFirst()!!
+    fun state(): STATE = updates.blockFirst()!!
 
     fun dispatch(e: ACTION) {
         emitter.onNext(e)
@@ -39,7 +39,12 @@ class Store<ACTION, STATE>(initial: STATE, private val reducer: Reducer<ACTION, 
 fun <ACTION, STATE> createStore(
     initialState: STATE,
     reducer: Reducer<ACTION, STATE>,
-    middleWare: MiddleWare<ACTION, STATE> = { it }
+    middleWares: List<MiddleWare<ACTION, STATE>> = emptyList()
 ): Store<ACTION, STATE> {
-    return Store(initialState, middleWare(reducer))
+
+    val combinedMiddleware = middleWares.fold({ it: Reducer<ACTION, STATE> -> it }, { acc, m -> acc.combine(m) })
+    return Store(initialState, combinedMiddleware(reducer))
 }
+
+fun <ACTION, STATE> MiddleWare<ACTION, STATE>.combine(other: MiddleWare<ACTION, STATE>): MiddleWare<ACTION, STATE> =
+    { reducer -> other(this(reducer)) }

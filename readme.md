@@ -12,19 +12,25 @@ data class TodoAppState(val todos: List<Todo> = emptyList(), val filter: Visibil
 
 // actions
 sealed class Action {
-    data class AddTodo(val text: String) : Action()
-    data class ToggleTodo(val index: Int) : Action()
+    sealed class TodoAction : Action() {
+        data class AddTodo(val text: String) : TodoAction()
+        data class ToggleTodo(val index: Int) : TodoAction()
+    }
+
     data class ChangeVisibility(val filter: VisibilityFilter) : Action()
 }
 
 // reducer
-val todoAppReducer: Reducer<Action, TodoAppState> = { action, state ->
+val todoReducer: Reducer<TodoAction, List<Todo>> = { action, todos ->
     when (action) {
+        is AddTodo -> todos + Todo(action.text)
+        is ToggleTodo -> todos.update(action.index) { it.copy(done = !it.done) }
+    }
+}
+val appReducer: Reducer<Action, TodoAppState> = { action, state ->
+    when (action) {
+        is TodoAction -> state.copy(todos = todoReducer(action, state.todos))
         is ChangeVisibility -> state.copy(filter = action.filter)
-        is AddTodo -> state.copy(todos = state.todos + Todo(text = action.text))
-        is ToggleTodo -> state.copy(todos = state.todos.update(action.index) { t: Todo ->
-            t.copy(done = !t.done)
-        })
     }
 }
 
@@ -34,21 +40,24 @@ class ReduxTest {
     @Test
     fun demo() {
 
-        val store = createStore(initialState = TodoAppState(), reducer = todoAppReducer)
+        val store = createStore(initialState = TodoAppState(), reducer = appReducer)
 
-        store.flux.subscribe { s: TodoAppState -> println("State changed $s") }
+        store.updates.subscribe { s: TodoAppState -> println("State changed $s") }
 
         store.dispatch(AddTodo("1"))
+
         await().untilAsserted {
             assertThat(store.state().todos).containsExactly(Todo(text = "1", done = false))
         }
 
         store.dispatch(ToggleTodo(0))
+
         await().untilAsserted {
             assertThat(store.state().todos).containsExactly(Todo(text = "1", done = true))
         }
 
         store.dispatch(ChangeVisibility(VisibilityFilter.DONE))
+
         await().untilAsserted {
             assertThat(store.state().filter).isEqualTo(VisibilityFilter.DONE)
         }
@@ -57,26 +66,49 @@ class ReduxTest {
     @Test
     fun demoWithSubscribe() {
 
-        val store = createStore(TodoAppState(), todoAppReducer)
+        val store = createStore(TodoAppState(), appReducer)
 
-        StepVerifier.create(store.flux)
+        StepVerifier.create(store.updates)
             .assertNext {
                 // initial state
                 assertThat(it).isEqualTo(TodoAppState())
+            }.then {
+                store.dispatch(AddTodo("1"))
+            }.assertNext {
+                assertThat(it.todos).containsExactly(Todo(text = "1", done = false))
             }
             .then {
-                store.dispatch(AddTodo("1"))
-            }
-            .assertNext {
-                assertThat(it.todos).containsExactly(Todo(text = "1", done = false))
-            }.then {
                 store.dispatch(ToggleTodo(0))
             }.assertNext {
                 assertThat(it.todos).containsExactly(Todo(text = "1", done = true))
-            }.then {
+            }
+            .then {
                 store.dispatch(ChangeVisibility(VisibilityFilter.DONE))
             }.assertNext {
                 assertThat(it.filter).isEqualTo(VisibilityFilter.DONE)
+            }
+            .thenCancel().verify()
+    }
+
+
+    @Test
+    fun demoFilteredSubscribe() {
+
+        val store = createStore(TodoAppState(), appReducer)
+
+        val filterUpdated = store.updates.map { s -> s.filter }.distinctUntilChanged()
+
+        StepVerifier.create(filterUpdated)
+            .assertNext {
+                // initial state
+                assertThat(it).isEqualTo(VisibilityFilter.ALL)
+            }
+            .then {
+                store.dispatch(AddTodo("1")) // should not trigger update
+                store.dispatch(ChangeVisibility(VisibilityFilter.DONE))
+            }
+            .assertNext {
+                assertThat(it).isEqualTo(VisibilityFilter.DONE)
             }
             .thenCancel().verify()
     }
