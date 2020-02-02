@@ -39,12 +39,12 @@ class ReduxTest {
 
         store.dispatch(AddTodo("1"))
         await().untilAsserted {
-            assertThat(store.state().todos.map { it.text }).containsExactly("1")
+            assertThat(store.state().todos).containsExactly(Todo(text = "1", done = false))
         }
 
         store.dispatch(ToggleTodo(0))
         await().untilAsserted {
-            assertThat(store.state().todos.map { it.done }).containsExactly(true)
+            assertThat(store.state().todos).containsExactly(Todo(text = "1", done = true))
         }
 
         store.dispatch(ChangeVisibility(VisibilityFilter.DONE))
@@ -67,11 +67,11 @@ class ReduxTest {
                 store.dispatch(AddTodo("1"))
             }
             .assertNext {
-                assertThat(it.todos.map { it.text }).containsExactly("1")
+                assertThat(it.todos).containsExactly(Todo(text = "1", done = false))
             }.then {
                 store.dispatch(ToggleTodo(0))
             }.assertNext {
-                assertThat(it.todos.map { it.done }).containsExactly(true)
+                assertThat(it.todos).containsExactly(Todo(text = "1", done = true))
             }.then {
                 store.dispatch(ChangeVisibility(VisibilityFilter.DONE))
             }.assertNext {
