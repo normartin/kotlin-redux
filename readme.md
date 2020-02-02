@@ -2,13 +2,21 @@
 # Redux with Kotlin
 
 Implementation of Redux [basic tutorial](https://redux.js.org/basics/basic-tutorial) in Kotlin (without UI).
-Uses [Reactor](https://projectreactor.io/) for publishing updates.
+Uses [Reactor's Flux](https://projectreactor.io/) for publishing updates.
 
 ````kotlin
 // state
-data class Todo(val text: String, val done: Boolean = false)
+data class Todo(
+    val text: String,
+    val done: Boolean = false
+)
+
 enum class VisibilityFilter { ALL, DONE, TODO }
-data class TodoAppState(val todos: List<Todo> = emptyList(), val filter: VisibilityFilter = VisibilityFilter.ALL)
+
+data class TodoAppState(
+    val todos: List<Todo> = emptyList(),
+    val filter: VisibilityFilter = VisibilityFilter.ALL
+)
 
 // actions
 sealed class Action {
@@ -20,7 +28,7 @@ sealed class Action {
     data class ChangeVisibility(val filter: VisibilityFilter) : Action()
 }
 
-// reducer
+// reducers
 val todoReducer: Reducer<TodoAction, List<Todo>> = { action, todos ->
     when (action) {
         is AddTodo -> todos + Todo(action.text)

@@ -27,13 +27,12 @@ class Store<ACTION, STATE>(initial: STATE, private val reducer: Reducer<ACTION, 
             newState
         })
         .cache(1)
+        .distinctUntilChanged { it.hashCode() }
         .subscribeOn(scheduler)
 
     fun state(): STATE = updates.blockFirst()!!
 
-    fun dispatch(e: ACTION) {
-        emitter.onNext(e)
-    }
+    fun dispatch(e: ACTION) = emitter.onNext(e)
 }
 
 fun <ACTION, STATE> createStore(
@@ -41,7 +40,6 @@ fun <ACTION, STATE> createStore(
     reducer: Reducer<ACTION, STATE>,
     middleWares: List<MiddleWare<ACTION, STATE>> = emptyList()
 ): Store<ACTION, STATE> {
-
     val combinedMiddleware = middleWares.fold({ it: Reducer<ACTION, STATE> -> it }, { acc, m -> acc.combine(m) })
     return Store(initialState, combinedMiddleware(reducer))
 }

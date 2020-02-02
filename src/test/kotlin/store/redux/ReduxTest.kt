@@ -12,9 +12,17 @@ import store.redux.Action.TodoAction.AddTodo
 import store.redux.Action.TodoAction.ToggleTodo
 
 // state
-data class Todo(val text: String, val done: Boolean = false)
+data class Todo(
+    val text: String,
+    val done: Boolean = false
+)
+
 enum class VisibilityFilter { ALL, DONE, TODO }
-data class TodoAppState(val todos: List<Todo> = emptyList(), val filter: VisibilityFilter = VisibilityFilter.ALL)
+
+data class TodoAppState(
+    val todos: List<Todo> = emptyList(),
+    val filter: VisibilityFilter = VisibilityFilter.ALL
+)
 
 // actions
 sealed class Action {
@@ -26,7 +34,7 @@ sealed class Action {
     data class ChangeVisibility(val filter: VisibilityFilter) : Action()
 }
 
-// reducer
+// reducers
 val todoReducer: Reducer<TodoAction, List<Todo>> = { action, todos ->
     when (action) {
         is AddTodo -> todos + Todo(action.text)
@@ -156,15 +164,16 @@ class ReduxTest {
     }
 
     @Test
-    fun throwingReducerDoesNotBreakStore() {
+    fun throwingReducerDoesNotBreakStoreAndDoesNotEmitUpdate() {
 
         val store = createStore(10, { a: Int, s: Int -> s / a })
 
         StepVerifier.create(store.updates)
             .expectNext(10)
-            .then { store.dispatch(0) } // division by zero
-            .expectNext(10)
-            .then { store.dispatch(10) }
+            .then {
+                store.dispatch(0)  // division by zero
+                store.dispatch(10)
+            }
             .expectNext(1)
             .thenCancel()
             .verify()
@@ -177,7 +186,6 @@ class ReduxTest {
 
     @Test
     fun canFilter() {
-        LOG.info("start")
 
         val store = createStore(TodoAppState(), appReducer)
 
