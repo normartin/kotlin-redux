@@ -2,6 +2,7 @@
 # Redux with Kotlin
 
 Implementation of Redux [basic tutorial](https://redux.js.org/basics/basic-tutorial) in Kotlin (without UI).
+Uses [Reactor](https://projectreactor.io/) for publishing updates.
 
 ````kotlin
 // state
