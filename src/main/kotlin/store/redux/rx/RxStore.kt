@@ -1,4 +1,4 @@
-package store.redux
+package store.redux.rx
 
 import org.slf4j.LoggerFactory
 import reactor.core.publisher.Flux

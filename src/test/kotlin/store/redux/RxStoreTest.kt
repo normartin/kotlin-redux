@@ -10,6 +10,9 @@ import store.redux.Action.ChangeVisibility
 import store.redux.Action.TodoAction
 import store.redux.Action.TodoAction.AddTodo
 import store.redux.Action.TodoAction.ToggleTodo
+import store.redux.rx.MiddleWare
+import store.redux.rx.Reducer
+import store.redux.rx.createStore
 
 // state
 data class Todo(
@@ -48,8 +51,8 @@ val appReducer: Reducer<Action, TodoAppState> = { action, state ->
     }
 }
 
-class ReduxTest {
-    val LOG = LoggerFactory.getLogger(ReduxTest::class.java)
+class RxStoreTest {
+    val LOG = LoggerFactory.getLogger(RxStoreTest::class.java)
 
     @Test
     fun demo() {
