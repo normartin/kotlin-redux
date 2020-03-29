@@ -1,4 +1,4 @@
-package store.redux
+package store.redux.rx
 
 import org.assertj.core.api.Assertions.assertThat
 import org.awaitility.Awaitility.await
@@ -6,13 +6,11 @@ import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 import reactor.core.publisher.Flux
 import reactor.test.StepVerifier
-import store.redux.Action.ChangeVisibility
-import store.redux.Action.TodoAction
-import store.redux.Action.TodoAction.AddTodo
-import store.redux.Action.TodoAction.ToggleTodo
-import store.redux.rx.MiddleWare
-import store.redux.rx.Reducer
-import store.redux.rx.createStore
+import store.redux.rx.Action.ChangeVisibility
+import store.redux.rx.Action.TodoAction
+import store.redux.rx.Action.TodoAction.AddTodo
+import store.redux.rx.Action.TodoAction.ToggleTodo
+import store.redux.update
 
 // state
 data class Todo(
@@ -64,13 +62,23 @@ class RxStoreTest {
         store.dispatch(AddTodo("1"))
 
         await().untilAsserted {
-            assertThat(store.state().todos).containsExactly(Todo(text = "1", done = false))
+            assertThat(store.state().todos).containsExactly(
+                Todo(
+                    text = "1",
+                    done = false
+                )
+            )
         }
 
         store.dispatch(ToggleTodo(0))
 
         await().untilAsserted {
-            assertThat(store.state().todos).containsExactly(Todo(text = "1", done = true))
+            assertThat(store.state().todos).containsExactly(
+                Todo(
+                    text = "1",
+                    done = true
+                )
+            )
         }
 
         store.dispatch(ChangeVisibility(VisibilityFilter.DONE))
@@ -83,7 +91,10 @@ class RxStoreTest {
     @Test
     fun demoWithSubscribe() {
 
-        val store = createStore(TodoAppState(), appReducer)
+        val store = createStore(
+            TodoAppState(),
+            appReducer
+        )
 
         StepVerifier.create(store.updates)
             .assertNext {
@@ -111,7 +122,10 @@ class RxStoreTest {
     @Test
     fun demoFilteredSubscribe() {
 
-        val store = createStore(TodoAppState(), appReducer)
+        val store = createStore(
+            TodoAppState(),
+            appReducer
+        )
 
         val filterUpdated = store.updates.map { s -> s.filter }.distinctUntilChanged()
 
@@ -162,7 +176,12 @@ class RxStoreTest {
         store.dispatch(ToggleTodo(0))
 
         await().untilAsserted {
-            assertThat(store.state().todos).containsExactly(Todo("make a middleware", done = true))
+            assertThat(store.state().todos).containsExactly(
+                Todo(
+                    "make a middleware",
+                    done = true
+                )
+            )
         }
     }
 
@@ -190,7 +209,10 @@ class RxStoreTest {
     @Test
     fun canFilter() {
 
-        val store = createStore(TodoAppState(), appReducer)
+        val store = createStore(
+            TodoAppState(),
+            appReducer
+        )
 
         val firstTodoUpdates = store.updates.filterOnTodoIndex(0)
 
