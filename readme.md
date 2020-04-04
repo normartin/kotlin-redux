@@ -2,7 +2,7 @@
 # Redux with Kotlin and Java
 
 Implementation of Redux [basic tutorial](https://redux.js.org/basics/basic-tutorial) in Kotlin and Java (without UI).
-Uses [Reactor's Flux](https://projectreactor.io/) for publishing updates.
+Uses [Kotlin's Flow](https://kotlinlang.org/docs/reference/coroutines/flow.html) for publishing updates.
 
 ## Kotlin
 
@@ -44,90 +44,143 @@ val appReducer: Reducer<Action, TodoAppState> = { action, state ->
     }
 }
 
-class ReduxTest {
-    val LOG = LoggerFactory.getLogger(ReduxTest::class.java)
+@ExperimentalCoroutinesApi
+class RxStoreTest {
 
     @Test
     fun demo() {
+        runBlocking {
+            val store = createStore(initialState = TodoAppState(), reducer = appReducer)
 
-        val store = createStore(initialState = TodoAppState(), reducer = appReducer)
-
-        store.updates.subscribe { s: TodoAppState -> println("State changed $s") }
-
-        store.dispatch(AddTodo("1"))
-
-        await().untilAsserted {
+            store.dispatch(AddTodo("1"))
             assertThat(store.state().todos).containsExactly(Todo(text = "1", done = false))
-        }
 
-        store.dispatch(ToggleTodo(0))
-
-        await().untilAsserted {
+            store.dispatch(ToggleTodo(0))
             assertThat(store.state().todos).containsExactly(Todo(text = "1", done = true))
-        }
 
-        store.dispatch(ChangeVisibility(VisibilityFilter.DONE))
-
-        await().untilAsserted {
+            store.dispatch(ChangeVisibility(VisibilityFilter.DONE))
             assertThat(store.state().filter).isEqualTo(VisibilityFilter.DONE)
         }
     }
 
     @Test
     fun demoWithSubscribe() {
+        runBlocking {
+            val store = createStore(
+                TodoAppState(),
+                appReducer
+            )
 
-        val store = createStore(TodoAppState(), appReducer)
+            val subscription: Flow<TodoAppState> = store.updates()
 
-        StepVerifier.create(store.updates)
-            .assertNext {
-                // initial state
-                assertThat(it).isEqualTo(TodoAppState())
-            }.then {
+            subscription.test {
+                assertThat(expectItem()).isEqualTo(TodoAppState())
+
                 store.dispatch(AddTodo("1"))
-            }.assertNext {
-                assertThat(it.todos).containsExactly(Todo(text = "1", done = false))
-            }
-            .then {
-                store.dispatch(ToggleTodo(0))
-            }.assertNext {
-                assertThat(it.todos).containsExactly(Todo(text = "1", done = true))
-            }
-            .then {
-                store.dispatch(ChangeVisibility(VisibilityFilter.DONE))
-            }.assertNext {
-                assertThat(it.filter).isEqualTo(VisibilityFilter.DONE)
-            }
-            .thenCancel().verify()
-    }
+                assertThat(expectItem().todos).containsExactly(Todo(text = "1", done = false))
 
+                store.dispatch(ToggleTodo(0))
+                assertThat(expectItem().todos).containsExactly(Todo(text = "1", done = true))
+
+                store.dispatch(ChangeVisibility(VisibilityFilter.DONE))
+                assertThat(expectItem().filter).isEqualTo(VisibilityFilter.DONE)
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+    }
 
     @Test
     fun demoFilteredSubscribe() {
+        runBlocking {
 
-        val store = createStore(TodoAppState(), appReducer)
+            val store = createStore(
+                TodoAppState(),
+                appReducer
+            )
 
-        val filterUpdated = store.updates.map { s -> s.filter }.distinctUntilChanged()
+            val filterUpdates = store.updates().map { s -> s.filter }.distinctUntilChanged()
 
-        StepVerifier.create(filterUpdated)
-            .assertNext {
-                // initial state
-                assertThat(it).isEqualTo(VisibilityFilter.ALL)
-            }
-            .then {
-                store.dispatch(AddTodo("1")) // should not trigger update
+            filterUpdates.test {
                 store.dispatch(ChangeVisibility(VisibilityFilter.DONE))
+                assertThat(expectItem()).isEqualTo(VisibilityFilter.DONE)
+
+                store.dispatch(AddTodo("1"))
+                store.dispatch(ChangeVisibility(VisibilityFilter.DONE))
+                expectNoEvents()
+
+                store.dispatch(ChangeVisibility(VisibilityFilter.ALL))
+                assertThat(expectItem()).isEqualTo(VisibilityFilter.ALL)
+
+                cancelAndIgnoreRemainingEvents()
             }
-            .assertNext {
-                assertThat(it).isEqualTo(VisibilityFilter.DONE)
+        }
+    }
+
+    @Test
+    fun throwingReducerDoesNotBreakStoreAndDoesNotEmitUpdate() {
+        runBlocking {
+            val store = createStore(10, { a: Int, s: Int -> s / a })
+
+            val updates = store.updates()
+
+            updates.test {
+                assertThat(expectItem()).isEqualTo(10)
+
+                store.dispatch(0)  // division by zero
+                expectNoEvents()
+
+                store.dispatch(10)
+                assertThat(expectItem()).isEqualTo(1)
+
+                cancelAndIgnoreRemainingEvents()
             }
-            .thenCancel().verify()
+        }
+    }
+
+    fun Flow<TodoAppState>.filterOnTodoIndex(index: Int): Flow<Todo> = this
+        .filter { it.todos.elementAtOrNull(index) != null }
+        .map { it.todos[index] }
+        .distinctUntilChanged()
+
+    @Test
+    fun canFilter() {
+        runBlocking {
+            val store = createStore(
+                TodoAppState(),
+                appReducer
+            )
+
+            val firstTodoUpdates = store.updates().filterOnTodoIndex(0)
+
+            firstTodoUpdates.test {
+
+
+                store.dispatch(AddTodo("1"))
+                assertThat(expectItem().text).isEqualTo("1")
+
+                store.dispatch(AddTodo("other"))
+                expectNoEvents()
+
+                store.dispatch(ToggleTodo(0))
+                assertThat(expectItem().done).isTrue()
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
     }
 }
 ````
 
-[source](src/test/kotlin/store/redux/ReduxTest.kt)
+[source](src/test/kotlin/store/redux/flow/FlowStoreTest.kt)
 
-[Store implementation](src/main/kotlin/store/redux/Store.kt)
+[Store implementation](src/main/kotlin/store/redux/flow/FlowStore.kt)
+
+## Kotlin with RX (Reactor) 
+
+[RxStore implementation](src/main/kotlin/store/redux/rx/RxStore.kt)
+
+[Tests / usage](src/test/kotlin/store/redux/rx/RxStoreTest.kt)
 
 
 ## Java

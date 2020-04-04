@@ -1,5 +1,6 @@
 package store.redux.flow
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.ConflatedBroadcastChannel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
@@ -28,6 +29,7 @@ class Store<ACTION, STATE>(initial: STATE, private val reducer: Reducer<ACTION, 
             LOG.error("Failed to process $e on $state")
             return
         }
+        // no need to check for result as it is always true
         ups.offer(state)
     }
 }
