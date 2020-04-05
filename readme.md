@@ -1,12 +1,46 @@
 
 # Redux with Kotlin and Java
 
-Implementation of a Redux store with implementation Redux's [basic tutorial](https://redux.js.org/basics/basic-tutorial) in Kotlin.
+Implementation of a Redux store and the Todo app from Redux's [basic tutorial](https://redux.js.org/basics/basic-tutorial) in Kotlin.
 Uses [Kotlin's Flow](https://kotlinlang.org/docs/reference/coroutines/flow.html) for publishing updates.
 
 ## Kotlin
 
 ````kotlin
+// state
+data class Todo(val text: String, val done: Boolean = false)
+
+enum class VisibilityFilter { ALL, DONE, TODO }
+
+data class TodoAppState(
+    val todos: List<Todo> = emptyList(),
+    val filter: VisibilityFilter = VisibilityFilter.ALL
+)
+
+// actions
+sealed class Action {
+    sealed class TodoAction : Action() {
+        data class AddTodo(val text: String) : TodoAction()
+        data class ToggleTodo(val index: Int) : TodoAction()
+    }
+
+    data class ChangeVisibility(val filter: VisibilityFilter) : Action()
+}
+
+// reducers
+val todoReducer: Reducer<TodoAction, List<Todo>> = { action, todos ->
+    when (action) {
+        is AddTodo -> todos + Todo(action.text)
+        is ToggleTodo -> todos.update(action.index) { it.copy(done = !it.done) }
+    }
+}
+val appReducer: Reducer<Action, TodoAppState> = { action, state ->
+    when (action) {
+        is TodoAction -> state.copy(todos = todoReducer(action, state.todos))
+        is ChangeVisibility -> state.copy(filter = action.filter)
+    }
+}
+
 class RxStoreTest {
 
     @Test
@@ -64,6 +98,27 @@ class RxStoreTest {
 
                 store.dispatch(ChangeVisibility(VisibilityFilter.ALL))
                 expectNextItemEquals(VisibilityFilter.ALL)
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+    }
+
+    @Test
+    fun throwingReducerDoesNotBreakStoreAndDoesNotEmitUpdate() {
+        runBlocking {
+            val store = createStore(10, { a: Int, s: Int -> s / a })
+
+            val updates = store.updates()
+
+            updates.test {
+                expectNextItemEquals(10)
+
+                store.dispatch(0)  // division by zero
+                expectNoEvents()
+
+                store.dispatch(10)
+                assertThat(nextItem()).isEqualTo(1)
 
                 cancelAndIgnoreRemainingEvents()
             }

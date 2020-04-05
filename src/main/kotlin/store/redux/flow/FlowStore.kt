@@ -1,6 +1,5 @@
 package store.redux.flow
 
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.ConflatedBroadcastChannel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
@@ -14,23 +13,18 @@ typealias Reducer<ACTION, STATE> = (ACTION, STATE) -> STATE
 typealias MiddleWare<ACTION, STATE> = (Reducer<ACTION, STATE>) -> (Reducer<ACTION, STATE>)
 
 class Store<ACTION, STATE>(initial: STATE, private val reducer: Reducer<ACTION, STATE>) {
-    private var state: STATE = initial
 
-    private val ups: ConflatedBroadcastChannel<STATE> = ConflatedBroadcastChannel(initial)
+    private val updates: ConflatedBroadcastChannel<STATE> = ConflatedBroadcastChannel(initial)
 
-    fun updates(): Flow<STATE> = ups.asFlow()
+    fun updates(): Flow<STATE> = updates.asFlow()
 
-    fun state(): STATE = state
+    fun state(): STATE = updates.value
 
-    fun dispatch(e: ACTION) {
-        try {
-            state = reducer(e, state)
-        } catch (e: Exception) {
-            LOG.error("Failed to process $e on $state")
-            return
-        }
+    fun dispatch(e: ACTION) = try {
         // no need to check for result as it is always true
-        ups.offer(state)
+        updates.offer(reducer(e, updates.value))
+    } catch (e: RuntimeException) {
+        LOG.error("Failed to process $e on ${updates.value}", e)
     }
 }
 

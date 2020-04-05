@@ -19,10 +19,7 @@ import store.redux.update
 val LOG = LoggerFactory.getLogger(RxStoreTest::class.java)
 
 // state
-data class Todo(
-    val text: String,
-    val done: Boolean = false
-)
+data class Todo(val text: String, val done: Boolean = false)
 
 enum class VisibilityFilter { ALL, DONE, TODO }
 
@@ -98,7 +95,6 @@ class RxStoreTest {
     @Test
     fun canFilterOnSubTree() {
         runBlocking {
-
             val store = createStore(initialState = TodoAppState(), reducer = appReducer)
 
             val filterUpdates = store.updates().map { s -> s.filter }.distinctUntilChanged()
