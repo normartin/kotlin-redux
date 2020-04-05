@@ -17,15 +17,12 @@
  */
 package com.squareup.sqldelight.runtime.coroutines
 
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.Channel.Factory.UNLIMITED
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.channels.receiveOrNull
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeout
 
 suspend fun <T> Flow<T>.test(timeoutMs: Long = 1000L, validate: suspend FlowAssert<T>.() -> Unit) {
     coroutineScope {
@@ -110,7 +107,7 @@ class FlowAssert<T> internal constructor(
         }
     }
 
-    suspend fun expectItem(): T {
+    suspend fun nextItem(): T {
         val event = withTimeout {
             events.receive()
         }
@@ -137,5 +134,12 @@ class FlowAssert<T> internal constructor(
             throw AssertionError("Expected error but was $event")
         }
         return event.throwable
+    }
+}
+
+suspend fun <T> FlowAssert<T>.expectNextItemEquals(expected: T) {
+    val actual = nextItem()
+    if (expected != actual) {
+        throw AssertionError("Expected next item to equal $expected but got $actual")
     }
 }
