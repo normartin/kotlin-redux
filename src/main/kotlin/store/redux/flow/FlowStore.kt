@@ -20,11 +20,14 @@ class Store<ACTION, STATE>(initial: STATE, private val reducer: Reducer<ACTION, 
 
     fun state(): STATE = updates.value
 
-    fun dispatch(e: ACTION) = try {
-        // no need to check for result as it is always true
-        updates.offer(reducer(e, updates.value))
-    } catch (e: RuntimeException) {
-        LOG.error("Failed to process $e on ${updates.value}", e)
+    @Synchronized
+    fun dispatch(e: ACTION) {
+        try {
+            // no need to check for result as it is always true
+            updates.offer(reducer(e, updates.value))
+        } catch (e: RuntimeException) {
+            LOG.error("Failed to process $e on ${updates.value}", e)
+        }
     }
 }
 

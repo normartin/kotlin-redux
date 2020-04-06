@@ -6,6 +6,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.newFixedThreadPoolContext
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -118,7 +121,7 @@ class RxStoreTest {
     @Test
     fun throwingReducerDoesNotBreakStoreAndDoesNotEmitUpdate() {
         runBlocking {
-            val store = createStore(10, { a: Int, s: Int -> s / a })
+            val store = createStore(10, { state: Int, action: Int -> action / state })
 
             val updates = store.updates()
 
@@ -199,6 +202,25 @@ class RxStoreTest {
             )
         )
     }
+
+    @Test
+    fun doesNotSufferFromLostUpdate() {
+        runBlocking(context = newFixedThreadPoolContext(8, "pool")) {
+            val store = createStore(0, { sum: Int, i: Int -> sum + i })
+            val numberOfUpdates = 100000
+
+            val jobs = (1..numberOfUpdates).map {
+                launch {
+                    store.dispatch(1)
+                }
+            }
+
+            jobs.joinAll()
+
+            assertThat(store.state()).isEqualTo(numberOfUpdates)
+        }
+    }
+
 }
 
 fun Flow<TodoAppState>.filterOnTodoIndex(index: Int): Flow<Todo> = this
